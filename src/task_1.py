@@ -9,7 +9,19 @@ The dataset provided is CIFAR-10, which is an image classification dataset with 
 and images of resolution 32x32. The dataset classes are:
 ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck'].
 
-Focus on building the network structure. The training and evaluation loops are already provided.
+This Task is comprised of two parts (a,b)
+
+Task 1a:
+In the first part, focus on building the network structure. The training and evaluation 
+loops are already provided. Training Hyperparameters are set to suitable values, we will 
+fine tune them later.
+
+Task 1b:
+In the "Training Configuration" section, you can improve the effectiveness of model 
+training by adjusting hyperparameters. Start by modifying parameters like batch size, 
+epoch count, or learning rate. You can also expand the configuration by introducing 
+new elements, such as adding Dropout to the model, and then testing different Dropout 
+rates to evaluate their impact on performance.
 """
 
 ################################# Neural Network ##################################
@@ -22,11 +34,12 @@ class SimpleCNN(nn.Module):
         """
         super().__init__()
         self.layers = nn.Sequential(
-            # Your Model goes here
+            # TASK 1a:  Your Model goes here
             
 
 
-            nn.Linear(42 , 10)  # The output has to be an Tensor with one dimension of 10
+            nn.Linear(42 , 10)
+            # The output shape has to be (10), change the first parameter to suit your model
         )
 
     def forward(self, x):
@@ -34,25 +47,29 @@ class SimpleCNN(nn.Module):
         return x
     
 ################################# Training Configuration ###########################
-
 # Select the best available device (GPU, MPS, or CPU)
 device = get_best_torch_device()
 
 # Initialize the model and move it to the selected device
+# If you want to give hyperparameters to the model, you could do that via the constructor
 model = SimpleCNN().to(device)
 
-# Define the loss function (CrossEntropyLoss is standard for classification tasks)
+#### TASK 1b: Experiment with different Hyperparameters: ####
+batch_size = 64
+num_epochs = 10
+learning_rate = 0.001
+
+# Select optimizer and set the defined learn-rate check the 'optim' package for alternatives
+optimizer = optim.Adam(model.parameters(),lr=learning_rate)
+
+# Select the loss function (CE is a good default but there are others for multi-class classification)
 criterion = nn.CrossEntropyLoss()
+#### --------------------------------------------------- ####
 
-# Define the optimizer (Adam optimizer with a learning rate of 0.001)
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-# Load Datasets (set batch size)
-train_loader, test_loader = get_dataset(batch_size=64)
+# Load Datasets
+train_loader, test_loader = get_dataset(batch_size=batch_size)
 
 ################################# Training Loop ##################################
-
-num_epochs = 10  # Number of epochs for training
 
 for epoch in range(num_epochs):
     model.train() 

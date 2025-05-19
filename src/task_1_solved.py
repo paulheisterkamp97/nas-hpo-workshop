@@ -59,7 +59,7 @@ train_loader, test_loader = get_dataset(batch_size=64)
 
 ################################# Training Loop ##################################
 
-num_epochs = 2  # Number of epochs for training
+num_epochs = 10  # Number of epochs for training
 
 for epoch in range(num_epochs):
     model.train() 
