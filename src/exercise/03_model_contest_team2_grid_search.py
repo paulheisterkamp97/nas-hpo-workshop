@@ -74,12 +74,12 @@ class FashionMNISTModel(nn.Module):
 
 # Group 2: Grid Search
 # Search Space
-search_space = {
-    'num_layers': [2, 3, 4],
-    'num_units': [64, 128, 256],
-    'dropout_rate': [0.1, 0.2, 0.3],
-    'learning_rate': [0.001, 0.01, 0.1]
-}
+# ToDo: search_space = {
+#     'num_layers': ...,
+#     'num_units': ...,
+#     'dropout_rate': ...,
+#     'learning_rate': ...
+# }
 
 n_trials = 1
 for values in search_space.values():
@@ -141,7 +141,7 @@ study_grid = optuna.create_study(
     storage=storage,
     load_if_exists=True,
     sampler=grid_sampler)
-study_grid.optimize(objective_grid, n_trials=5)
+study_grid.optimize(objective_grid, n_trials=n_trials)
 
 # Print the best result
 print(f"Best configuration (Grid Search): {study_grid.best_params}, Accuracy: {study_grid.best_value}")

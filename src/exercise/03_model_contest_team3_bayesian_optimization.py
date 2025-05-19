@@ -73,10 +73,10 @@ class FashionMNISTModel(nn.Module):
 
 # Group 3: Bayesian Optimization
 def objective(trial):
-    num_layers = trial.suggest_int('num_layers', 2, 4)
-    num_units = trial.suggest_categorical('num_units', [64, 128, 256])
-    dropout_rate = trial.suggest_float('dropout_rate', 0.1, 0.3)
-    learning_rate = trial.suggest_loguniform('learning_rate', 1e-4, 1e-1)
+    # ToDo: num_layers = trial.suggest_int('num_layers', ..., ...)
+    # ToDo: num_units = trial.suggest_categorical('num_units', [..., ..., ...])
+    # ToDo: dropout_rate = trial.suggest_float('dropout_rate', ..., ...)
+    # ToDo: learning_rate = trial.suggest_loguniform('learning_rate', ..., ...)
 
     # Modell erstellen
     model = FashionMNISTModel(input_size=28 * 28, num_layers=num_layers, num_units=num_units, dropout_rate=dropout_rate)
@@ -115,12 +115,14 @@ def objective(trial):
 
 
 # Create a study and optimize
+# ToDo: n_trials=
+
 study = optuna.create_study(
     direction='maximize',
     study_name="bayesian_optimization",
     storage=storage,
     load_if_exists=True,)
-study.optimize(objective, n_trials=20)
+study.optimize(objective, n_trials=n_trials)
 
 print(f"Best configuration: {study.best_params}, Accuracy: {study.best_value}")
 

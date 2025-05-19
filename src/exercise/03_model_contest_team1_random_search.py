@@ -75,10 +75,10 @@ class FashionMNISTModel(nn.Module):
 # Define the objective function for Random Search
 def objective(trial):
     # Hyperparameter definieren
-    num_layers = trial.suggest_int('num_layers', 2, 4)
-    num_units = trial.suggest_categorical('num_units', [64, 128, 256])
-    dropout_rate = trial.suggest_float('dropout_rate', 0.1, 0.3)
-    learning_rate = trial.suggest_loguniform('learning_rate', 1e-4, 1e-1)
+    # ToDo: num_layers = trial.suggest_int('num_layers', ..., ...)
+    # ToDo: num_units = trial.suggest_categorical('num_units', [..., ....])
+    # ToDo: dropout_rate = trial.suggest_float('dropout_rate', ..., ...)
+    # ToDo: learning_rate = trial.suggest_loguniform('learning_rate', ..., ...)
 
     # Modell erstellen
     model = FashionMNISTModel(input_size=28 * 28, num_layers=num_layers, num_units=num_units, dropout_rate=dropout_rate)
@@ -116,12 +116,14 @@ def objective(trial):
 
 
 # Create the study and optimize with Random Search
+# ToDo: n_trials=
+
 study_random = optuna.create_study(
     study_name="random_search_optimization",
     direction='maximize', storage=storage,
     load_if_exists=True,
     sampler=optuna.samplers.RandomSampler())
-study_random.optimize(objective, n_trials=20)  # Run 20 trials
+study_random.optimize(objective, n_trials=n_trials)
 
 # Print the best result
 print(f"Best configuration (Random Search): {study_random.best_params}, Accuracy: {study_random.best_value}")
