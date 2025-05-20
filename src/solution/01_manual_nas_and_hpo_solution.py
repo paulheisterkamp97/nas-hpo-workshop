@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.optim as optim
 
-from utils import get_dataset, get_best_torch_device, evaluate_model
+from src.library.utils import get_dataset, get_best_torch_device, evaluate_model
 
 """
 This task involves manually configuring a simple neural network for a data science task.
