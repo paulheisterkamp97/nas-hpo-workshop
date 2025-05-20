@@ -32,7 +32,6 @@ from torch.utils.data import DataLoader
 import optuna
 import optuna_dashboard
 
-# FashionMNIST Daten laden
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
 
 train_dataset = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
@@ -48,59 +47,49 @@ storage = "sqlite:///optuna_study.db"
 
 
 # Define Base Model
-class FashionMNISTModel(nn.Module):
-    def __init__(self, input_size, num_layers, num_units, dropout_rate, activation_function):
-        super(FashionMNISTModel, self).__init__()
-        layers = [nn.Flatten()]
-        for _ in range(num_layers):
-            layers.append(nn.Linear(input_size, num_units))
-            layers.append(activation_function)
-            layers.append(nn.Dropout(dropout_rate))
-            input_size = num_units
-        layers.append(nn.Linear(num_units, 10))
-        self.model = nn.Sequential(*layers)
+class FashionMNISTCNN(nn.Module):
+    def __init__(self, num_conv_layers, num_filters, kernel_size, dropout_rate):
+        super(FashionMNISTCNN, self).__init__()
+        layers = []
+        in_channels = 1
+        for i in range(num_conv_layers):
+            out_channels = num_filters * (2 ** i)
+            layers.append(nn.Conv2d(in_channels, out_channels, kernel_size, padding=1))
+            layers.append(nn.ReLU())
+            layers.append(nn.MaxPool2d(2))
+            in_channels = out_channels
+        self.conv = nn.Sequential(*layers)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.flatten = nn.Flatten()
+
+        with torch.no_grad():
+            dummy_input = torch.zeros(1, 1, 28, 28)
+            dummy_output = self.conv(dummy_input)
+            flattened_size = dummy_output.view(1, -1).size(1)
+
+        self.fc = nn.Linear(flattened_size, 10)
 
     def forward(self, x):
-        return self.model(x)
+        x = self.conv(x)
+        x = self.flatten(x)
+        x = self.dropout(x)
+        x = self.fc(x)
+        return x
 
-# Search Strategies
-# Each group will choose a search strategy. Examples:
-# - Group 1: Random Search
-# - Group 2: Grid Search
-# - Group 3: Bayesian Optimization (e.g., with [Optuna](https://optuna.org/))
-
-
-# Group 1: Random Search
-# Define the objective function for Random Search
 def objective(trial):
-    # Hyperparameter definieren
-    # ToDo: num_layers = trial.suggest_int('num_layers', ..., ...)
-    # ToDo: num_units = trial.suggest_categorical('num_units', [..., ....])
+    # ToDo: num_conv_layers = trial.suggest_int('num_conv_layers', ..., ...)
+    # ToDo: num_filters = trial.suggest_categorical('num_filters', [..., ..., ...])
+    # ToDo: kernel_size = trial.suggest_categorical('kernel_size', [..., ...])
     # ToDo: dropout_rate = trial.suggest_float('dropout_rate', ..., ...)
-    # ToDo: learning_rate = trial.suggest_loguniform('learning_rate', ..., ...)
+    # ToDo: learning_rate = trial.suggest_float('learning_rate', ..., ...)
 
-    activation_choice = trial.suggest_categorical('activation_function', ['ReLU', 'Tanh', 'Sigmoid'])
-    if activation_choice == 'ReLU':
-        activation_function = nn.ReLU()
-    elif activation_choice == 'Tanh':
-        activation_function = nn.Tanh()
-    else:
-        activation_function = nn.Sigmoid()
-
-    model = FashionMNISTModel(
-        input_size=28 * 28,
-        num_layers=num_layers,
-        num_units=num_units,
-        dropout_rate=dropout_rate,
-        activation_function=activation_function
-    )
+    model = FashionMNISTCNN(num_conv_layers, num_filters, kernel_size, dropout_rate)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Training
     model.train()
     for epoch in range(5):
         for batch_idx, (data, target) in enumerate(train_loader):
@@ -111,7 +100,6 @@ def objective(trial):
             loss.backward()
             optimizer.step()
 
-    # Evaluation
     model.eval()
     correct = 0
     total = 0

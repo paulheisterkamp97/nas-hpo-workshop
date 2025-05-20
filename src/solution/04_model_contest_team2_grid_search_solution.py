@@ -33,7 +33,6 @@ import optuna
 import optuna_dashboard
 import itertools
 
-# FashionMNIST Daten laden
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
 
 train_dataset = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
@@ -44,41 +43,41 @@ test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
 print(f"Training data: {len(train_dataset)}, Test data: {len(test_dataset)}")
 
-# Study storage
 storage = "sqlite:///optuna_study.db"
 
-
-# Define Base Model
-class FashionMNISTModel(nn.Module):
-    def __init__(self, input_size, num_layers, num_units, dropout_rate, activation_function):
-        super(FashionMNISTModel, self).__init__()
-        layers = [nn.Flatten()]
-        for _ in range(num_layers):
-            layers.append(nn.Linear(input_size, num_units))
-            layers.append(activation_function)
-            layers.append(nn.Dropout(dropout_rate))
-            input_size = num_units
-        layers.append(nn.Linear(num_units, 10))
-        self.model = nn.Sequential(*layers)
+class FashionMNISTCNN(nn.Module):
+    def __init__(self, num_conv_layers, num_filters, kernel_size, dropout_rate):
+        super(FashionMNISTCNN, self).__init__()
+        layers = []
+        in_channels = 1
+        for i in range(num_conv_layers):
+            out_channels = num_filters * (2 ** i)
+            layers.append(nn.Conv2d(in_channels, out_channels, kernel_size, padding=1))
+            layers.append(nn.ReLU())
+            layers.append(nn.MaxPool2d(2))
+            in_channels = out_channels
+        self.conv = nn.Sequential(*layers)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.flatten = nn.Flatten()
+        with torch.no_grad():
+            dummy_input = torch.zeros(1, 1, 28, 28)
+            dummy_output = self.conv(dummy_input)
+            flattened_size = dummy_output.view(1, -1).size(1)
+        self.fc = nn.Linear(flattened_size, 10)
 
     def forward(self, x):
-        return self.model(x)
+        x = self.conv(x)
+        x = self.flatten(x)
+        x = self.dropout(x)
+        x = self.fc(x)
+        return x
 
-
-# Search Strategies
-# Each group will choose a search strategy. Examples:
-# - Group 1: Random Search
-# - Group 2: Grid Search
-# - Group 3: Bayesian Optimization (e.g., with [Optuna](https://optuna.org/))
-
-# Group 2: Grid Search
-# Search Space
 search_space = {
-    'num_layers': [2, 3, 4],
-    'num_units': [64, 128, 256],
-    'dropout_rate': [0.1, 0.2, 0.3],
-    'learning_rate': [0.001, 0.01, 0.1],
-    'activation_function': ['ReLU', 'Tanh', 'Sigmoid']
+    'num_conv_layers': [1, 2, 3],
+    'num_filters': [16, 32],
+    'kernel_size': [3, 5],
+    'dropout_rate': [0.2, 0.3],
+    'learning_rate': [0.001, 0.01]
 }
 
 n_trials = 1
@@ -87,37 +86,20 @@ for values in search_space.values():
 
 print(f"Count Trials Grid Search: {n_trials}")
 
-
-# Define the objective function for Random Search
 def objective_grid(trial):
-    # Hyperparameter aus dem Suchraum auswählen
-    num_layers = trial.suggest_categorical('num_layers', search_space['num_layers'])
-    num_units = trial.suggest_categorical('num_units', search_space['num_units'])
+    num_conv_layers = trial.suggest_categorical('num_conv_layers', search_space['num_conv_layers'])
+    num_filters = trial.suggest_categorical('num_filters', search_space['num_filters'])
+    kernel_size = trial.suggest_categorical('kernel_size', search_space['kernel_size'])
     dropout_rate = trial.suggest_categorical('dropout_rate', search_space['dropout_rate'])
     learning_rate = trial.suggest_categorical('learning_rate', search_space['learning_rate'])
 
-    activation_choice = trial.suggest_categorical('activation_function', search_space['activation_function'])
-    if activation_choice == 'ReLU':
-        activation_function = nn.ReLU()
-    elif activation_choice == 'Tanh':
-        activation_function = nn.Tanh()
-    else:
-        activation_function = nn.Sigmoid()
-
-    model = FashionMNISTModel(
-        input_size=28 * 28,
-        num_layers=num_layers,
-        num_units=num_units,
-        dropout_rate=dropout_rate,
-        activation_function=activation_function
-    )
+    model = FashionMNISTCNN(num_conv_layers, num_filters, kernel_size, dropout_rate)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Training
     model.train()
     for epoch in range(5):
         for batch_idx, (data, target) in enumerate(train_loader):
@@ -128,7 +110,6 @@ def objective_grid(trial):
             loss.backward()
             optimizer.step()
 
-    # Evaluation
     model.eval()
     correct = 0
     total = 0
@@ -143,8 +124,6 @@ def objective_grid(trial):
     accuracy = correct / total
     return accuracy
 
-
-# Create a GridSampler
 grid_sampler = optuna.samplers.GridSampler(search_space)
 
 # Create the study and optimize with Grid Search
@@ -154,7 +133,7 @@ study_grid = optuna.create_study(
     storage=storage,
     load_if_exists=True,
     sampler=grid_sampler)
-study_grid.optimize(objective_grid, n_trials=n_trials)
+study_grid.optimize(objective_grid, n_trials=5)
 
 # Print the best result
 print(f"Best configuration (Grid Search): {study_grid.best_params}, Accuracy: {study_grid.best_value}")
