@@ -19,8 +19,7 @@
 # - Have fun and good luck! 😊
 
 # Preparation
-# Please install the necessary libraries. Run the following code to ensure everything is ready:
-# !pip install tensorflow keras scikit-learn optuna
+# Please install the necessary libraries.
 
 # Data Loading
 # We will use the FashionMNIST dataset. The following code loads and prepares the data.
@@ -51,12 +50,12 @@ storage = "sqlite:///optuna_study.db"
 
 # Define Base Model
 class FashionMNISTModel(nn.Module):
-    def __init__(self, input_size, num_layers, num_units, dropout_rate):
+    def __init__(self, input_size, num_layers, num_units, dropout_rate, activation_function):
         super(FashionMNISTModel, self).__init__()
         layers = [nn.Flatten()]
         for _ in range(num_layers):
             layers.append(nn.Linear(input_size, num_units))
-            layers.append(nn.ReLU())
+            layers.append(activation_function)
             layers.append(nn.Dropout(dropout_rate))
             input_size = num_units
         layers.append(nn.Linear(num_units, 10))
@@ -78,7 +77,8 @@ search_space = {
     'num_layers': [2, 3, 4],
     'num_units': [64, 128, 256],
     'dropout_rate': [0.1, 0.2, 0.3],
-    'learning_rate': [0.001, 0.01, 0.1]
+    'learning_rate': [0.001, 0.01, 0.1],
+    'activation_function': ['ReLU', 'Tanh', 'Sigmoid']
 }
 
 n_trials = 1
@@ -96,8 +96,21 @@ def objective_grid(trial):
     dropout_rate = trial.suggest_categorical('dropout_rate', search_space['dropout_rate'])
     learning_rate = trial.suggest_categorical('learning_rate', search_space['learning_rate'])
 
-    # Modell erstellen
-    model = FashionMNISTModel(input_size=28 * 28, num_layers=num_layers, num_units=num_units, dropout_rate=dropout_rate)
+    activation_choice = trial.suggest_categorical('activation_function', search_space['activation_function'])
+    if activation_choice == 'ReLU':
+        activation_function = nn.ReLU()
+    elif activation_choice == 'Tanh':
+        activation_function = nn.Tanh()
+    else:
+        activation_function = nn.Sigmoid()
+
+    model = FashionMNISTModel(
+        input_size=28 * 28,
+        num_layers=num_layers,
+        num_units=num_units,
+        dropout_rate=dropout_rate,
+        activation_function=activation_function
+    )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
@@ -106,7 +119,7 @@ def objective_grid(trial):
 
     # Training
     model.train()
-    for epoch in range(5):  # 5 Epochen
+    for epoch in range(5):
         for batch_idx, (data, target) in enumerate(train_loader):
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
@@ -141,7 +154,7 @@ study_grid = optuna.create_study(
     storage=storage,
     load_if_exists=True,
     sampler=grid_sampler)
-study_grid.optimize(objective_grid, n_trials=5)
+study_grid.optimize(objective_grid, n_trials=n_trials)
 
 # Print the best result
 print(f"Best configuration (Grid Search): {study_grid.best_params}, Accuracy: {study_grid.best_value}")
