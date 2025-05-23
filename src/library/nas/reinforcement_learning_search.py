@@ -1,10 +1,3 @@
-"""
-Reinforcement Learning-based Neural Architecture Search (NAS)
-
-This module implements reinforcement learning approaches for NAS,
-including both policy gradient (REINFORCE) and Q-learning methods.
-"""
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -21,30 +14,24 @@ from src.library.nas.utils_2 import get_dataset, train_model, evaluate_model, ge
 
 class PolicyNetwork(nn.Module):
     """
-    Policy network for the controller in policy gradient-based NAS
-    
-    This network learns to generate architecture decisions by predicting
-    action probabilities at each decision point.
+    Policy network for the controller in RL-based NAS
     """
     def __init__(self, input_size, hidden_size, output_size):
-        nn.Module.__init__(self)
+        super(PolicyNetwork, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, output_size)
         
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        return F.softmax(x, dim=-1)  # Output probabilities for each action
+        return F.softmax(x, dim=-1)
 
 class QNetwork(nn.Module):
     """
     Q-Network for Q-learning based NAS
-    
-    This network learns to predict the expected reward (Q-value) for
-    each possible action given the current state.
     """
     def __init__(self, state_size, action_size, hidden_size=128):
-        nn.Module.__init__(self)
+        super(QNetwork, self).__init__()
         self.fc1 = nn.Linear(state_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, action_size)
@@ -52,15 +39,11 @@ class QNetwork(nn.Module):
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        return self.fc3(x)  # Output Q-values for each action
+        return self.fc3(x)
 
 class ReinforcementLearningSearch:
     """
     Reinforcement Learning-based Neural Architecture Search
-    
-    This class implements two RL approaches for NAS:
-    1. Policy Gradient (REINFORCE): Learns a policy to directly generate architectures
-    2. Q-Learning: Learns to select the best architecture from a set of candidates
     """
     def __init__(self, search_space, method='policy_gradient', num_episodes=50, 
                  epochs_per_model=5, batch_size=64, device=None, small_subset=True):
@@ -83,18 +66,17 @@ class ReinforcementLearningSearch:
         self.batch_size = batch_size
         self.small_subset = small_subset
         
-        # Automatically select the best available device (GPU/CPU)
         if device is None:
             self.device = get_best_torch_device()
         else:
             self.device = device
             
-        # Load datasets for training and evaluation
+        # Load datasets
         self.train_loader, self.val_loader, self.test_loader = get_dataset(
             batch_size=batch_size, small_subset=small_subset
         )
         
-        # Storage for search results
+        # Results storage
         self.results = []
         self.best_architecture = None
         self.best_accuracy = 0
@@ -114,9 +96,6 @@ class ReinforcementLearningSearch:
     def setup_action_space(self):
         """
         Set up the action space for the RL agent
-        
-        This defines the possible actions the agent can take at each decision point
-        when designing a neural architecture.
         """
         # Define the possible actions for each decision point
         self.action_spaces = {
@@ -157,9 +136,6 @@ class ReinforcementLearningSearch:
     def setup_policy_gradient(self):
         """
         Set up the policy gradient (REINFORCE) agent
-        
-        The policy gradient method learns a policy that directly generates
-        architecture decisions.
         """
         # Initialize the policy network
         self.policy_network = PolicyNetwork(
@@ -174,13 +150,10 @@ class ReinforcementLearningSearch:
         # Storage for episode history
         self.saved_log_probs = []
         self.rewards = []
-
+    
     def setup_q_learning(self):
         """
         Set up the Q-learning agent
-        
-        Q-learning learns to predict the expected reward for each action
-        and selects the action with the highest expected reward.
         """
         # Initialize the Q-network
         self.q_network = QNetwork(
@@ -189,7 +162,7 @@ class ReinforcementLearningSearch:
             hidden_size=128
         ).to(self.device)
         
-        # Initialize the target network (for stable learning)
+        # Initialize the target network
         self.target_network = QNetwork(
             state_size=self.state_dim,
             action_size=self.action_dim,
@@ -200,7 +173,7 @@ class ReinforcementLearningSearch:
         # Initialize the optimizer
         self.optimizer = optim.Adam(self.q_network.parameters(), lr=0.001)
         
-        # Initialize the replay buffer for experience replay
+        # Initialize the replay buffer
         self.replay_buffer = deque(maxlen=1000)
         
         # Hyperparameters
@@ -211,388 +184,32 @@ class ReinforcementLearningSearch:
         self.batch_size_rl = 32  # Batch size for RL training (not to be confused with neural network training)
         self.update_target_every = 5  # Update target network every N episodes
     
-    
-    def search(self, verbose=True, use_simple_sampling=False):
-        """
-        Perform architecture search using the selected RL method
-        
-        Args:
-            verbose: Whether to print progress
-            use_simple_sampling: Whether to use simple sampling instead of RL (for demonstration)
-            
-        Returns:
-            Best architecture found and its corresponding model
-        """
-        start_time = time.time()
-        
-        if verbose:
-            print(f"Starting {self.method.replace('_', ' ').title()} Search with {self.num_episodes} episodes...")
-        
-        if use_simple_sampling:
-            # Simple sampling for demonstration purposes
-            for i in range(self.num_episodes):
-                # Sample a simple architecture
-                architecture = self.search_space.sample_simple_architecture()
-                
-                # Build and evaluate the model
-                model = self.search_space.build_model_from_architecture(architecture)
-                
-                # Define loss function and optimizer
-                criterion = nn.CrossEntropyLoss()
-                optimizer = optim.Adam(model.parameters(), lr=0.001)
-                
-                # Train the model
-                history = train_model(
-                    model=model,
-                    train_loader=self.train_loader,
-                    val_loader=self.val_loader,
-                    criterion=criterion,
-                    optimizer=optimizer,
-                    device=self.device,
-                    num_epochs=self.epochs_per_model,
-                    verbose=False
-                )
-                
-                # Evaluate the model
-                eval_results = evaluate_model(
-                    model=model,
-                    test_loader=self.test_loader,
-                    device=self.device,
-                    verbose=False
-                )
-                
-                # Store results
-                result = {
-                    'architecture': architecture,
-                    'accuracy': eval_results['accuracy'],
-                    'ms_per_image': eval_results['ms_per_image'],
-                    'val_accuracy': history['best_val_acc'],
-                    'model': model
-                }
-                
-                self.results.append(result)
-                
-                # Update best architecture if needed
-                if result['accuracy'] > self.best_accuracy:
-                    self.best_architecture = architecture
-                    self.best_accuracy = result['accuracy']
-                    self.best_model = model
-                    
-                    if verbose:
-                        print(f"New best architecture found! Accuracy: {self.best_accuracy:.2f}%")
-        else:
-            # Use the selected RL method
-            if self.method == 'policy_gradient':
-                self.search_policy_gradient(verbose)
-            elif self.method == 'q_learning':
-                self.search_q_learning(verbose)
-        
-        
-        end_time = time.time()
-        search_time = (end_time - start_time) / 60  # in minutes
-        
-        if verbose:
-            print(f"RL Search completed in {search_time:.2f} minutes")
-            print(f"Best architecture accuracy: {self.best_accuracy:.2f}%")
-        
-        return self.best_architecture, self.best_model
-  
-    def search_policy_gradient(self, verbose=True):
-        """
-        Perform architecture search using policy gradient (REINFORCE)
-        """
-        # Use tqdm for progress tracking if verbose
-        if verbose:
-            iterator = tqdm(range(self.num_episodes))
-        else:
-            iterator = range(self.num_episodes)
-        
-        for episode in iterator:
-            # Reset episode variables
-            self.saved_log_probs = []
-            
-            # Generate an architecture by sampling from the policy
-            actions = []
-            state = np.zeros(self.state_dim)  # Initial state
-            
-            # Sample actions for each decision point
-            for i in range(self.max_sequence_length):
-                action = self.select_action_policy_gradient(state)
-                actions.append(action)
-                
-                # Update state to include the selected action
-                state[i] = action / self.action_dim  # Normalize
-            
-            # Decode actions to architecture
-            architecture = self.decode_actions_to_architecture(actions)
-            
-            # Build and evaluate the model
-            model = self.search_space.build_model_from_architecture(architecture)
-            
-            # Define loss function and optimizer
-            criterion = nn.CrossEntropyLoss()
-            optimizer = optim.Adam(model.parameters(), lr=0.001)
-            
-            # Train the model
-            history = train_model(
-                model=model,
-                train_loader=self.train_loader,
-                val_loader=self.val_loader,
-                criterion=criterion,
-                optimizer=optimizer,
-                device=self.device,
-                num_epochs=self.epochs_per_model,
-                verbose=False
-            )
-            
-            # Evaluate the model
-            eval_results = evaluate_model(
-                model=model,
-                test_loader=self.test_loader,
-                device=self.device,
-                verbose=False
-            )
-            
-            # Store results
-            result = {
-                'architecture': architecture,
-                'accuracy': eval_results['accuracy'],
-                'ms_per_image': eval_results['ms_per_image'],
-                'val_accuracy': history['best_val_acc'],
-                'model': model
-            }
-            
-            self.results.append(result)
-            
-            # Update best architecture if needed
-            if result['accuracy'] > self.best_accuracy:
-                self.best_architecture = architecture
-                self.best_accuracy = result['accuracy']
-                self.best_model = model
-                
-                if verbose:
-                    tqdm.write(f"New best architecture found! Accuracy: {self.best_accuracy:.2f}%")
-            
-            # Calculate reward (use validation accuracy as reward)
-            reward = history['best_val_acc']
-            self.rewards.append(reward)
-            
-            # Update policy network
-            self.update_policy()
-    
-    def search_q_learning(self, verbose=True):
-        """
-        Perform architecture search using Q-learning
-        """
-        # Generate a pool of candidate architectures
-        candidate_architectures = []
-        for _ in range(self.action_dim):
-            architecture = self.search_space.sample_random_architecture()
-            candidate_architectures.append(architecture)
-        
-        # Use tqdm for progress tracking if verbose
-        if verbose:
-            iterator = tqdm(range(self.num_episodes))
-        else:
-            iterator = range(self.num_episodes)
-        
-        for episode in iterator:
-            # Encode current state (initially random)
-            if episode == 0:
-                state = np.random.rand(self.state_dim)
-            
-            # Select an architecture using epsilon-greedy policy
-            action = self.select_action_q_learning(state, self.epsilon)
-            architecture = candidate_architectures[action]
-            
-            # Build and evaluate the model
-            model = self.search_space.build_model_from_architecture(architecture)
-            
-            # Define loss function and optimizer
-            criterion = nn.CrossEntropyLoss()
-            optimizer = optim.Adam(model.parameters(), lr=0.001)
-            
-            # Train the model
-            history = train_model(
-                model=model,
-                train_loader=self.train_loader,
-                val_loader=self.val_loader,
-                criterion=criterion,
-                optimizer=optimizer,
-                device=self.device,
-                num_epochs=self.epochs_per_model,
-                verbose=False
-            )
-            
-            # Evaluate the model
-            eval_results = evaluate_model(
-                model=model,
-                test_loader=self.test_loader,
-                device=self.device,
-                verbose=False
-            )
-            
-            # Store results
-            result = {
-                'architecture': architecture,
-                'accuracy': eval_results['accuracy'],
-                'ms_per_image': eval_results['ms_per_image'],
-                'val_accuracy': history['best_val_acc'],
-                'model': model
-            }
-            
-            self.results.append(result)
-            
-            # Update best architecture if needed
-            if result['accuracy'] > self.best_accuracy:
-                self.best_architecture = architecture
-                self.best_accuracy = result['accuracy']
-                self.best_model = model
-                
-                if verbose:
-                    tqdm.write(f"New best architecture found! Accuracy: {self.best_accuracy:.2f}%")
-            
-            # Calculate reward (use validation accuracy as reward)
-            reward = history['best_val_acc']
-            
-            # Encode next state (the architecture we just evaluated)
-            next_state = self.encode_architecture_to_state(architecture)
-            
-            # Store transition in replay buffer
-            self.replay_buffer.append((state, action, reward, next_state))
-            
-            # Update state
-            state = next_state
-            
-            # Update Q-network
-            if len(self.replay_buffer) > self.batch_size_rl:
-                self.update_q_network()
-            
-            # Update target network
-            if episode % self.update_target_every == 0:
-                self.target_network.load_state_dict(self.q_network.state_dict())
-            
-            # Decay epsilon
-            if self.epsilon > self.epsilon_min:
-                self.epsilon *= self.epsilon_decay
-    
     def select_action_policy_gradient(self, state):
         """
         Select an action using the policy network
-        
-        Args:
-            state: Current state
-            
-        Returns:
-            Selected action
         """
         state = torch.FloatTensor(state).to(self.device)
         probs = self.policy_network(state)
-        
-        # Sample action from the probability distribution
         m = torch.distributions.Categorical(probs)
         action = m.sample()
-        
-        # Save log probability for later use in policy update
         self.saved_log_probs.append(m.log_prob(action))
-        
         return action.item()
-    
     
     def select_action_q_learning(self, state, epsilon):
         """
         Select an action using epsilon-greedy policy
-        
-        Args:
-            state: Current state
-            epsilon: Exploration rate
-            
-        Returns:
-            Selected action
         """
         if np.random.random() < epsilon:
-            # Exploration: select a random action
             return np.random.randint(0, self.action_dim)
         else:
-            # Exploitation: select the action with highest Q-value
             state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             with torch.no_grad():
                 q_values = self.q_network(state)
-            return q_values.argmax().item()
-    
-
-    def update_policy(self):
-        """
-        Update the policy network using the REINFORCE algorithm
-        """
-        # Calculate returns (discounted rewards)
-        R = 0
-        returns = []
-        
-        # Calculate returns in reverse order
-        for r in self.rewards[::-1]:
-            R = r + 0.99 * R  # 0.99 is the discount factor
-            returns.insert(0, R)
-        
-        # Normalize returns
-        returns = torch.tensor(returns)
-        returns = (returns - returns.mean()) / (returns.std() + 1e-9)
-        
-        # Calculate loss
-        policy_loss = []
-        for log_prob, R in zip(self.saved_log_probs, returns):
-            policy_loss.append(-log_prob * R)
-        
-        policy_loss = torch.cat(policy_loss).sum()
-        
-        # Update policy network
-        self.optimizer.zero_grad()
-        policy_loss.backward()
-        self.optimizer.step()
-        
-        # Clear episode history
-        self.saved_log_probs = []
-        self.rewards = []
-    
-
-    def update_q_network(self):
-        """
-        Update the Q-network using experience replay
-        """
-        # Sample a batch from the replay buffer
-        batch = random.sample(self.replay_buffer, self.batch_size_rl)
-        states, actions, rewards, next_states = zip(*batch)
-        
-        # Convert to tensors
-        states = torch.FloatTensor(states).to(self.device)
-        actions = torch.LongTensor(actions).to(self.device)
-        rewards = torch.FloatTensor(rewards).to(self.device)
-        next_states = torch.FloatTensor(next_states).to(self.device)
-        
-        # Compute current Q values
-        current_q = self.q_network(states).gather(1, actions.unsqueeze(1))
-        
-        # Compute next Q values using target network
-        with torch.no_grad():
-            next_q = self.target_network(next_states).max(1)[0]
-        
-        # Compute target Q values
-        target_q = rewards + self.gamma * next_q
-        
-        # Compute loss
-        loss = F.mse_loss(current_q.squeeze(), target_q)
-        
-        # Update Q-network
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+            return torch.argmax(q_values).item()
     
     def encode_architecture_to_state(self, architecture):
         """
         Encode an architecture specification into a state vector
-        
-        This converts the architecture dictionary into a fixed-length
-        vector that can be used as input to the RL agent.
         """
         state = np.zeros(self.state_dim)
         
@@ -608,11 +225,7 @@ class ReinforcementLearningSearch:
             base_idx = 1 + i * 4
             
             # Encode operation type
-            op_idx = -1
-            for j, (name, _) in enumerate(self.search_space.conv_ops):
-                if name == layer['op']:
-                    op_idx = j
-                    break
+            op_idx = next(j for j, (name, _) in enumerate(self.search_space.conv_ops) if name == layer['op'])
             state[base_idx] = op_idx / (len(self.search_space.conv_ops) - 1)  # Normalize
             
             # Encode channel size
@@ -620,20 +233,12 @@ class ReinforcementLearningSearch:
             state[base_idx + 1] = channel_idx / (len(self.search_space.channel_choices) - 1)  # Normalize
             
             # Encode activation
-            act_idx = -1
-            for j, (name, _) in enumerate(self.search_space.activation_ops):
-                if name == layer['activation']:
-                    act_idx = j
-                    break
+            act_idx = next(j for j, (name, _) in enumerate(self.search_space.activation_ops) if name == layer['activation'])
             state[base_idx + 2] = act_idx / (len(self.search_space.activation_ops) - 1)  # Normalize
             
             # Encode pooling
             if layer['use_pooling']:
-                pool_idx = -1
-                for j, (name, _) in enumerate(self.search_space.pooling_ops):
-                    if name == layer['pooling']:
-                        pool_idx = j
-                        break
+                pool_idx = next(j for j, (name, _) in enumerate(self.search_space.pooling_ops) if name == layer['pooling'])
                 state[base_idx + 3] = (pool_idx + 1) / len(self.search_space.pooling_ops)  # +1 because 0 means no pooling
             else:
                 state[base_idx + 3] = 0  # No pooling
@@ -647,28 +252,18 @@ class ReinforcementLearningSearch:
         
         # Encode first FC layer size
         if architecture['fc_layers']:
-            fc_size = architecture['fc_layers'][0]['out_features']
-            fc_size_idx = -1
-            if fc_size in self.search_space.fc_sizes:
-                fc_size_idx = self.search_space.fc_sizes.index(fc_size)
-            else:
-                fc_size_idx = 0
+            fc_size_idx = self.search_space.fc_sizes.index(architecture['fc_layers'][0]['out_features']) if architecture['fc_layers'][0]['out_features'] in self.search_space.fc_sizes else 0
             state[fc_base_idx + 1] = fc_size_idx / (len(self.search_space.fc_sizes) - 1)  # Normalize
             
             # Encode dropout rate
-            dropout_rate = architecture['fc_layers'][0]['dropout_rate']
-            dropout_idx = self.search_space.dropout_rates.index(dropout_rate)
+            dropout_idx = self.search_space.dropout_rates.index(architecture['fc_layers'][0]['dropout_rate'])
             state[fc_base_idx + 2] = dropout_idx / (len(self.search_space.dropout_rates) - 1)  # Normalize
         
         return state
     
-    
     def decode_actions_to_architecture(self, actions):
         """
         Decode a sequence of actions into an architecture specification
-        
-        This converts the actions selected by the RL agent into a
-        complete architecture specification.
         """
         architecture = {
             'conv_layers': [],
@@ -678,7 +273,7 @@ class ReinforcementLearningSearch:
         }
         
         # Decode number of convolutional layers
-        num_layers_idx = actions[0] % self.action_spaces['num_layers']
+        num_layers_idx = actions[0]
         num_layers = self.search_space.num_layers_range[0] + num_layers_idx
         
         # Decode convolutional layers
@@ -688,7 +283,7 @@ class ReinforcementLearningSearch:
             
             # Decode operation type
             op_idx = actions[base_idx] % len(self.search_space.conv_ops)
-            op_name = self.search_space.conv_ops[op_idx][0]
+            op_name, _ = self.search_space.conv_ops[op_idx]
             
             # Decode channel size
             channel_idx = actions[base_idx + 1] % len(self.search_space.channel_choices)
@@ -696,7 +291,7 @@ class ReinforcementLearningSearch:
             
             # Decode activation
             act_idx = actions[base_idx + 2] % len(self.search_space.activation_ops)
-            act_name = self.search_space.activation_ops[act_idx][0]
+            act_name, _ = self.search_space.activation_ops[act_idx]
             
             # Decode pooling
             pool_idx = actions[base_idx + 3] % (len(self.search_space.pooling_ops) + 1)
@@ -705,7 +300,7 @@ class ReinforcementLearningSearch:
                 pool_name = None
             else:
                 use_pooling = True
-                pool_name = self.search_space.pooling_ops[pool_idx - 1][0]
+                pool_name, _ = self.search_space.pooling_ops[pool_idx - 1]
             
             # Add layer to architecture
             architecture['conv_layers'].append({
@@ -721,27 +316,24 @@ class ReinforcementLearningSearch:
         
         # Calculate feature size after convolutions and pooling
         feature_size = 32
-        num_pooling = 0
-        for layer in architecture['conv_layers']:
-            if layer['use_pooling']:
-                num_pooling += 1
+        num_pooling = sum(1 for layer in architecture['conv_layers'] if layer['use_pooling'])
         feature_size = feature_size // (2 ** num_pooling)
         
         # Calculate flattened feature dimension
         flattened_dim = in_channels * feature_size * feature_size
         
         # Decode FC layers
-        fc_base_idx = 1 + self.search_space.num_layers_range[1] * 4
+        fc_base_idx = 1 + num_layers * 4
         
         # Decode number of FC layers
-        num_fc_layers_idx = actions[fc_base_idx % len(actions)] % 2
+        num_fc_layers_idx = actions[fc_base_idx] % 2
         num_fc_layers = num_fc_layers_idx + 1  # Either 1 or 2 FC layers
         
         # Decode first FC layer
-        fc_size_idx = actions[(fc_base_idx + 1) % len(actions)] % len(self.search_space.fc_sizes)
+        fc_size_idx = actions[fc_base_idx + 1] % len(self.search_space.fc_sizes)
         fc_size = self.search_space.fc_sizes[fc_size_idx]
         
-        dropout_idx = actions[(fc_base_idx + 2) % len(actions)] % len(self.search_space.dropout_rates)
+        dropout_idx = actions[fc_base_idx + 2] % len(self.search_space.dropout_rates)
         dropout_rate = self.search_space.dropout_rates[dropout_idx]
         
         architecture['fc_layers'].append({
@@ -762,7 +354,288 @@ class ReinforcementLearningSearch:
         
         return architecture
     
-
+    def generate_random_architecture(self):
+        """
+        Generate a random architecture by sampling random actions
+        """
+        actions = []
+        
+        # Sample number of convolutional layers
+        num_layers_idx = np.random.randint(0, self.action_spaces['num_layers'])
+        actions.append(num_layers_idx)
+        
+        # Sample convolutional layers
+        num_layers = self.search_space.num_layers_range[0] + num_layers_idx
+        for _ in range(num_layers):
+            # Sample operation type
+            op_idx = np.random.randint(0, self.action_spaces['conv_op'])
+            actions.append(op_idx)
+            
+            # Sample channel size
+            channel_idx = np.random.randint(0, self.action_spaces['channel_size'])
+            actions.append(channel_idx)
+            
+            # Sample activation
+            act_idx = np.random.randint(0, self.action_spaces['activation'])
+            actions.append(act_idx)
+            
+            # Sample pooling
+            pool_idx = np.random.randint(0, self.action_spaces['pooling'])
+            actions.append(pool_idx)
+        
+        # Pad with zeros for unused layers
+        for _ in range(self.search_space.num_layers_range[1] - num_layers):
+            actions.extend([0, 0, 0, 0])
+        
+        # Sample FC layers
+        num_fc_layers_idx = np.random.randint(0, self.action_spaces['num_fc_layers'])
+        actions.append(num_fc_layers_idx)
+        
+        fc_size_idx = np.random.randint(0, self.action_spaces['fc_size'])
+        actions.append(fc_size_idx)
+        
+        dropout_idx = np.random.randint(0, self.action_spaces['dropout_rate'])
+        actions.append(dropout_idx)
+        
+        # Pad with zeros to fixed length
+        while len(actions) < self.max_sequence_length:
+            actions.append(0)
+        
+        return actions
+    
+    def evaluate_architecture(self, architecture):
+        """
+        Evaluate an architecture by training and testing a model
+        
+        Returns:
+            Reward (accuracy)
+        """
+        # Build model from architecture
+        model = self.search_space.build_model_from_architecture(architecture)
+        
+        # Define loss function and optimizer
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
+        
+        # Train the model
+        history = train_model(
+            model=model,
+            train_loader=self.train_loader,
+            val_loader=self.val_loader,
+            criterion=criterion,
+            optimizer=optimizer,
+            device=self.device,
+            num_epochs=self.epochs_per_model,
+            verbose=False
+        )
+        
+        # Evaluate the model
+        eval_results = evaluate_model(
+            model=model,
+            test_loader=self.test_loader,
+            device=self.device,
+            verbose=False
+        )
+        
+        # Store results
+        result = {
+            'architecture': architecture,
+            'accuracy': eval_results['accuracy'],
+            'ms_per_image': eval_results['ms_per_image'],
+            'val_accuracy': history['best_val_acc'],
+            'model': model
+        }
+        
+        self.results.append(result)
+        
+        # Update best architecture if needed
+        if result['accuracy'] > self.best_accuracy:
+            self.best_architecture = architecture
+            self.best_accuracy = result['accuracy']
+            self.best_model = model
+        
+        # Return reward (accuracy)
+        return eval_results['accuracy']
+    
+    def policy_gradient_update(self):
+        """
+        Update the policy network using the REINFORCE algorithm
+        """
+        R = 0
+        policy_loss = []
+        returns = []
+        
+        # Calculate returns
+        for r in self.rewards[::-1]:
+            R = r + 0.99 * R
+            returns.insert(0, R)
+        
+        returns = torch.tensor(returns)
+        returns = (returns - returns.mean()) / (returns.std() + 1e-9)
+        
+        # Calculate policy loss
+        for log_prob, R in zip(self.saved_log_probs, returns):
+            policy_loss.append(-log_prob * R)
+        
+        # Update policy network
+        self.optimizer.zero_grad()
+        policy_loss = torch.stack(policy_loss).sum()
+        policy_loss.backward()
+        self.optimizer.step()
+        
+        # Clear episode history
+        self.saved_log_probs = []
+        self.rewards = []
+    
+    def q_learning_update(self):
+        """
+        Update the Q-network using experience replay
+        """
+        if len(self.replay_buffer) < self.batch_size_rl:
+            return
+        
+        # Sample a batch from the replay buffer
+        batch = random.sample(self.replay_buffer, self.batch_size_rl)
+        states, actions, rewards, next_states, dones = zip(*batch)
+        
+        states = torch.FloatTensor(states).to(self.device)
+        actions = torch.LongTensor(actions).to(self.device)
+        rewards = torch.FloatTensor(rewards).to(self.device)
+        next_states = torch.FloatTensor(next_states).to(self.device)
+        dones = torch.FloatTensor(dones).to(self.device)
+        
+        # Get current Q values
+        current_q = self.q_network(states).gather(1, actions.unsqueeze(1))
+        
+        # Get next Q values
+        next_q = self.target_network(next_states).detach().max(1)[0]
+        target_q = rewards + (1 - dones) * self.gamma * next_q
+        
+        # Calculate loss
+        loss = F.mse_loss(current_q.squeeze(), target_q)
+        
+        # Update Q-network
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+    
+    def search_policy_gradient(self, verbose=True):
+        """
+        Perform architecture search using policy gradient (REINFORCE)
+        """
+        start_time = time.time()
+        
+        if verbose:
+            print(f"Starting Policy Gradient Search with {self.num_episodes} episodes...")
+            iterator = tqdm(range(self.num_episodes))
+        else:
+            iterator = range(self.num_episodes)
+        
+        for i in iterator:
+            # Reset state
+            state = np.zeros(self.state_dim)
+            actions = []
+            
+            # Generate an architecture by sampling actions from the policy network
+            for t in range(self.max_sequence_length):
+                action = self.select_action_policy_gradient(state)
+                actions.append(action)
+                
+                # Update state (in a real environment, this would be done by the environment)
+                # Here we just set the corresponding element to 1 to indicate the action taken
+                if t < len(state):
+                    state[t] = action / self.action_dim  # Normalize
+            
+            # Decode actions to architecture
+            architecture = self.decode_actions_to_architecture(actions)
+            
+            # Evaluate architecture and get reward
+            reward = self.evaluate_architecture(architecture)
+            self.rewards.append(reward)
+            
+            # Update policy network
+            if (i + 1) % 5 == 0 or i == self.num_episodes - 1:
+                self.policy_gradient_update()
+                
+                if verbose:
+                    tqdm.write(f"Episode {i+1}/{self.num_episodes}, Best accuracy: {self.best_accuracy:.2f}%")
+        
+        end_time = time.time()
+        search_time = (end_time - start_time) / 60  # in minutes
+        
+        if verbose:
+            print(f"Policy Gradient Search completed in {search_time:.2f} minutes")
+            print(f"Best architecture accuracy: {self.best_accuracy:.2f}%")
+        
+        return self.best_architecture, self.best_model
+    
+    def search_q_learning(self, verbose=True):
+        """
+        Perform architecture search using Q-learning
+        """
+        start_time = time.time()
+        
+        if verbose:
+            print(f"Starting Q-Learning Search with {self.num_episodes} episodes...")
+            iterator = tqdm(range(self.num_episodes))
+        else:
+            iterator = range(self.num_episodes)
+        
+        # Generate a pool of candidate architectures
+        candidate_architectures = [self.search_space.sample_random_architecture() 
+                                  for _ in range(self.action_dim)]
+        
+        for i in iterator:
+            # Current state is a random initial architecture
+            current_arch_idx = np.random.randint(0, len(candidate_architectures))
+            current_arch = candidate_architectures[current_arch_idx]
+            current_state = self.encode_architecture_to_state(current_arch)
+            
+            # Select action (which architecture to try next)
+            action = self.select_action_q_learning(current_state, self.epsilon)
+            next_arch = candidate_architectures[action]
+            next_state = self.encode_architecture_to_state(next_arch)
+            
+            # Evaluate architecture and get reward
+            reward = self.evaluate_architecture(next_arch)
+            
+            # Store transition in replay buffer
+            done = (i == self.num_episodes - 1)
+            self.replay_buffer.append((current_state, action, reward, next_state, done))
+            
+            # Update Q-network
+            self.q_learning_update()
+            
+            # Update target network
+            if (i + 1) % self.update_target_every == 0:
+                self.target_network.load_state_dict(self.q_network.state_dict())
+            
+            # Decay epsilon
+            self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+            
+            if verbose and ((i + 1) % 5 == 0 or i == self.num_episodes - 1):
+                tqdm.write(f"Episode {i+1}/{self.num_episodes}, "
+                          f"Epsilon: {self.epsilon:.4f}, "
+                          f"Best accuracy: {self.best_accuracy:.2f}%")
+        
+        end_time = time.time()
+        search_time = (end_time - start_time) / 60  # in minutes
+        
+        if verbose:
+            print(f"Q-Learning Search completed in {search_time:.2f} minutes")
+            print(f"Best architecture accuracy: {self.best_accuracy:.2f}%")
+        
+        return self.best_architecture, self.best_model
+    
+    def search(self, verbose=True):
+        """
+        Perform architecture search using the selected RL method
+        """
+        if self.method == 'policy_gradient':
+            return self.search_policy_gradient(verbose)
+        elif self.method == 'q_learning':
+            return self.search_q_learning(verbose)
+    
     def plot_search_results(self):
         """
         Plot the results of the RL-based search
@@ -772,69 +645,66 @@ class ReinforcementLearningSearch:
             return
         
         # Extract accuracies and inference times
-        accuracies = []
-        inference_times = []
-        
-        for result in self.results:
-            accuracies.append(result['accuracy'])
-            inference_times.append(result['ms_per_image'])
+        accuracies = [result['accuracy'] for result in self.results]
+        inference_times = [result['ms_per_image'] for result in self.results]
         
         plt.figure(figsize=(12, 5))
         
-        # Plot accuracy over episodes
+        # Plot accuracy distribution
         plt.subplot(1, 2, 1)
-        plt.plot(accuracies)
-        plt.axhline(self.best_accuracy, color='r', linestyle='--', 
+        plt.hist(accuracies, bins=10, alpha=0.7)
+        plt.axvline(self.best_accuracy, color='r', linestyle='--', 
                    label=f'Best: {self.best_accuracy:.2f}%')
-        plt.xlabel('Episode')
-        plt.ylabel('Accuracy (%)')
-        plt.title(f'{self.method.replace("_", " ").title()} Search - Accuracy over Episodes')
+        plt.xlabel('Accuracy (%)')
+        plt.ylabel('Count')
+        plt.title(f'Distribution of Model Accuracies ({self.method})')
         plt.legend()
         
-        # Plot inference time over episodes
+        # Plot inference time distribution
         plt.subplot(1, 2, 2)
-        plt.plot(inference_times)
-        
-        # Find the inference time of the best model
-        best_time = None
-        for r in self.results:
-            if r['accuracy'] == self.best_accuracy:
-                best_time = r['ms_per_image']
-                break
-                
-        plt.axhline(best_time, color='r', linestyle='--', 
+        plt.hist(inference_times, bins=10, alpha=0.7)
+        best_time = next(r['ms_per_image'] for r in self.results 
+                         if r['accuracy'] == self.best_accuracy)
+        plt.axvline(best_time, color='r', linestyle='--', 
                    label=f'Best model: {best_time:.2f} ms')
-        plt.xlabel('Episode')
-        plt.ylabel('Inference Time (ms/image)')
-        plt.title(f'{self.method.replace("_", " ").title()} Search - Inference Time over Episodes')
+        plt.xlabel('Inference Time (ms/image)')
+        plt.ylabel('Count')
+        plt.title('Distribution of Inference Times')
         plt.legend()
         
         plt.tight_layout()
         plt.show()
         
-        # Plot accuracy vs. inference time scatter plot
-        plt.figure(figsize=(10, 6))
-        plt.scatter(inference_times, accuracies, alpha=0.7)
-        plt.scatter([best_time], [self.best_accuracy], color='r', s=100, 
-                   label='Best model')
-        plt.xlabel('Inference Time (ms/image)')
-        plt.ylabel('Accuracy (%)')
-        plt.title(f'{self.method.replace("_", " ").title()} Search - Accuracy vs. Inference Time')
-        plt.grid(True, linestyle='--', alpha=0.7)
-        plt.legend()
-        plt.show()
-    
+        # Plot learning curve if using policy gradient
+        if self.method == 'policy_gradient' and len(self.results) >= 5:
+            plt.figure(figsize=(10, 6))
+            
+            # Calculate moving average of accuracy
+            window_size = min(5, len(accuracies) // 5)
+            moving_avg = np.convolve(accuracies, np.ones(window_size)/window_size, mode='valid')
+            
+            plt.plot(range(len(moving_avg)), moving_avg, label='Moving Average')
+            plt.plot(range(len(accuracies)), accuracies, 'o', alpha=0.5, label='Individual Models')
+            plt.axhline(self.best_accuracy, color='r', linestyle='--', 
+                       label=f'Best: {self.best_accuracy:.2f}%')
+            
+            plt.xlabel('Model Index')
+            plt.ylabel('Accuracy (%)')
+            plt.title('Learning Curve (Policy Gradient)')
+            plt.legend()
+            plt.grid(True, linestyle='--', alpha=0.7)
+            plt.show()
     
     def get_best_architecture_summary(self):
         """
-        Get a human-readable summary of the best architecture found
+        Get a summary of the best architecture found
         """
         if self.best_architecture is None:
             return "No architecture found. Run search() first."
         
         arch = self.best_architecture
         
-        summary = "Best Architecture Summary:\n"
+        summary = f"Best Architecture Summary ({self.method}):\n"
         summary += f"Accuracy: {self.best_accuracy:.2f}%\n\n"
         
         summary += "Convolutional Layers:\n"
