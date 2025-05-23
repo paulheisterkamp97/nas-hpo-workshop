@@ -147,7 +147,6 @@ class SearchSpace:
         Returns:
             dict: Architecture specification with conv_layers and fc_layers
         """
-        # OPTIONAL REMOVAL START - For simpler explanation, use sample_simple_architecture instead
         # Sample number of convolutional layers
         num_layers = np.random.randint(self.num_layers_range[0], self.num_layers_range[1] + 1)
         
@@ -240,7 +239,6 @@ class SearchSpace:
             # If only one FC layer, it goes directly to output
             architecture['fc_layers'][0]['out_features'] = 10
             architecture['fc_layers'][0]['activation'] = None
-        # OPTIONAL REMOVAL END
         
         return architecture
 

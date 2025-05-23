@@ -153,9 +153,7 @@ class ReinforcementLearningSearch:
             )
             # Action is to select a complete architecture
             self.action_dim = self.num_episodes  # We'll generate this many candidate architectures
-    # OPTIONAL REMOVAL END
     
-    # OPTIONAL REMOVAL START - For simpler explanation, use a simplified policy gradient setup
     def setup_policy_gradient(self):
         """
         Set up the policy gradient (REINFORCE) agent
@@ -176,9 +174,7 @@ class ReinforcementLearningSearch:
         # Storage for episode history
         self.saved_log_probs = []
         self.rewards = []
-    # OPTIONAL REMOVAL END
-    
-    # OPTIONAL REMOVAL START - For simpler explanation, use a simplified Q-learning setup
+
     def setup_q_learning(self):
         """
         Set up the Q-learning agent
@@ -214,7 +210,7 @@ class ReinforcementLearningSearch:
         self.epsilon_decay = 0.995
         self.batch_size_rl = 32  # Batch size for RL training (not to be confused with neural network training)
         self.update_target_every = 5  # Update target network every N episodes
-    # OPTIONAL REMOVAL END
+    
     
     def search(self, verbose=True, use_simple_sampling=False):
         """
@@ -232,7 +228,6 @@ class ReinforcementLearningSearch:
         if verbose:
             print(f"Starting {self.method.replace('_', ' ').title()} Search with {self.num_episodes} episodes...")
         
-        # OPTIONAL REMOVAL START - For simpler explanation, use simple sampling instead of RL
         if use_simple_sampling:
             # Simple sampling for demonstration purposes
             for i in range(self.num_episodes):
@@ -291,7 +286,7 @@ class ReinforcementLearningSearch:
                 self.search_policy_gradient(verbose)
             elif self.method == 'q_learning':
                 self.search_q_learning(verbose)
-        # OPTIONAL REMOVAL END
+        
         
         end_time = time.time()
         search_time = (end_time - start_time) / 60  # in minutes
@@ -301,8 +296,7 @@ class ReinforcementLearningSearch:
             print(f"Best architecture accuracy: {self.best_accuracy:.2f}%")
         
         return self.best_architecture, self.best_model
-    
-    # OPTIONAL REMOVAL START - For simpler explanation, this method can be removed
+  
     def search_policy_gradient(self, verbose=True):
         """
         Perform architecture search using policy gradient (REINFORCE)
@@ -385,9 +379,7 @@ class ReinforcementLearningSearch:
             
             # Update policy network
             self.update_policy()
-    # OPTIONAL REMOVAL END
     
-    # OPTIONAL REMOVAL START - For simpler explanation, this method can be removed
     def search_q_learning(self, verbose=True):
         """
         Perform architecture search using Q-learning
@@ -483,9 +475,7 @@ class ReinforcementLearningSearch:
             # Decay epsilon
             if self.epsilon > self.epsilon_min:
                 self.epsilon *= self.epsilon_decay
-    # OPTIONAL REMOVAL END
     
-    # OPTIONAL REMOVAL START - For simpler explanation, this method can be removed
     def select_action_policy_gradient(self, state):
         """
         Select an action using the policy network
@@ -507,9 +497,8 @@ class ReinforcementLearningSearch:
         self.saved_log_probs.append(m.log_prob(action))
         
         return action.item()
-    # OPTIONAL REMOVAL END
     
-    # OPTIONAL REMOVAL START - For simpler explanation, this method can be removed
+    
     def select_action_q_learning(self, state, epsilon):
         """
         Select an action using epsilon-greedy policy
@@ -530,9 +519,8 @@ class ReinforcementLearningSearch:
             with torch.no_grad():
                 q_values = self.q_network(state)
             return q_values.argmax().item()
-    # OPTIONAL REMOVAL END
     
-    # OPTIONAL REMOVAL START - For simpler explanation, this method can be removed
+
     def update_policy(self):
         """
         Update the policy network using the REINFORCE algorithm
@@ -565,9 +553,8 @@ class ReinforcementLearningSearch:
         # Clear episode history
         self.saved_log_probs = []
         self.rewards = []
-    # OPTIONAL REMOVAL END
     
-    # OPTIONAL REMOVAL START - For simpler explanation, this method can be removed
+
     def update_q_network(self):
         """
         Update the Q-network using experience replay
@@ -599,9 +586,7 @@ class ReinforcementLearningSearch:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-    # OPTIONAL REMOVAL END
     
-    # OPTIONAL REMOVAL START - For simpler explanation, this method can be removed
     def encode_architecture_to_state(self, architecture):
         """
         Encode an architecture specification into a state vector
@@ -676,9 +661,8 @@ class ReinforcementLearningSearch:
             state[fc_base_idx + 2] = dropout_idx / (len(self.search_space.dropout_rates) - 1)  # Normalize
         
         return state
-    # OPTIONAL REMOVAL END
     
-    # OPTIONAL REMOVAL START - For simpler explanation, this method can be removed
+    
     def decode_actions_to_architecture(self, actions):
         """
         Decode a sequence of actions into an architecture specification
@@ -777,9 +761,8 @@ class ReinforcementLearningSearch:
             })
         
         return architecture
-    # OPTIONAL REMOVAL END
     
-    # OPTIONAL REMOVAL START - For simpler explanation, this method can be removed
+
     def plot_search_results(self):
         """
         Plot the results of the RL-based search
@@ -840,7 +823,7 @@ class ReinforcementLearningSearch:
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.legend()
         plt.show()
-    # OPTIONAL REMOVAL END
+    
     
     def get_best_architecture_summary(self):
         """
